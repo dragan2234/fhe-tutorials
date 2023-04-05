@@ -5,6 +5,10 @@ struct U32Ct {
     inner: [ShortIntCt; 8] // little endian
 }
 
+struct FourBitVectorCt {
+    values: Vec<Ciphertext>,
+}
+
 // H constants
 const H: [u32; 8] = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -23,10 +27,25 @@ const K: [u32; 64] = [
 ];
 fn main() {
     // We generate a set of client/server keys, using the default parameters:
-    let (client_key, server_key) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    let (client_key, server_key) = gen_keys(PARAM_MESSAGE_4_CARRY_4);
 
-    let input_string = "hello world!";
+    let s = "hello world";
+    let mut bit_vec = Vec::new();
 
+    let mut ct_vec = Vec::new();
+
+    for b in s.as_bytes() {
+        bit_vec.push((b & 0b11110000) >> 4);
+        bit_vec.push(b & 0b00001111);
+    }
+
+    for b in bit_vec {
+        ct_vec.push(client_key.encrypt(b.into()));
+    }
+
+
+
+    
     // @todo: process string as bytes
     // process bytes as shortint
     // encrypt the input as vector of bits (4 bits? 8 bits?)
