@@ -1,9 +1,29 @@
 use tfhe::shortint::prelude::*;
 use tfhe::shortint::Ciphertext as ShortIntCt;
+use std::array;
 
+#[derive(Clone)]
 struct U32Ct {
-    inner: [ShortIntCt; 8] // little endian
+    inner: [ShortIntCt; 8], // little endian
 }
+fn bits(x: u8) -> [bool; 8] {
+    array::from_fn(|i| (x >> i) & 1 == 1)
+}
+impl U32Ct {
+    fn encrypt(x: [u8;8], client_key: &ClientKey) -> Self {
+        let myvec: U32Ct;
+        for fourBit in x {
+            myvec.inner.fill(client_key.encrypt(fourBit.into()));
+        }
+
+        Self {
+            inner: myvec.inner.into()
+        }
+    }
+    fn rotate_left() {
+    }
+}
+
 
 struct FourBitVectorCt {
     values: Vec<Ciphertext>,
@@ -34,18 +54,25 @@ fn main() {
 
     let mut ct_vec = Vec::new();
 
+    // process string as bytes and push them as 4bit values into bit_vec
     for b in s.as_bytes() {
         bit_vec.push((b & 0b11110000) >> 4);
         bit_vec.push(b & 0b00001111);
     }
 
+    println!("bit_vec: {:?}", bit_vec);
+    for value in &bit_vec {
+        println!("{:04b}", value);
+    }
+    println!("{}", bit_vec.len());
+
+    // push the encrypted 4bit values into ct_vec 
     for b in bit_vec {
         ct_vec.push(client_key.encrypt(b.into()));
     }
 
 
 
-    
     // @todo: process string as bytes
     // process bytes as shortint
     // encrypt the input as vector of bits (4 bits? 8 bits?)
@@ -54,21 +81,21 @@ fn main() {
     // decrypt and compare with standard sha256 rust
 
     // test code with some examples how tfhe-rs work:\
-    let msg1 = 3;
-    let msg2 = 3;
-    let scalar = 4;
+    // let msg1 = 3;
+    // let msg2 = 3;
+    // let scalar = 4;
 
-    let modulus = client_key.parameters.message_modulus.0;
+    // let modulus = client_key.parameters.message_modulus.0;
 
-    // We use the client key to encrypt two messages:
-    let mut ct_1 = client_key.encrypt(msg1);
-    let ct_2 = client_key.encrypt(msg2);
+    // // We use the client key to encrypt two messages:
+    // let mut ct_1 = client_key.encrypt(msg1);
+    // let ct_2 = client_key.encrypt(msg2);
 
-    server_key.unchecked_scalar_mul_assign(&mut ct_1, scalar);
-    server_key.unchecked_sub_assign(&mut ct_1, &ct_2);
-    server_key.unchecked_mul_lsb_assign(&mut ct_1, &ct_2);
+    // server_key.unchecked_scalar_mul_assign(&mut ct_1, scalar);
+    // server_key.unchecked_sub_assign(&mut ct_1, &ct_2);
+    // server_key.unchecked_mul_lsb_assign(&mut ct_1, &ct_2);
 
-    // We use the client key to decrypt the output of the circuit:
-    let output = client_key.decrypt(&ct_1);
-    println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
+    // // We use the client key to decrypt the output of the circuit:
+    // let output = client_key.decrypt(&ct_1);
+    // println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
 }
