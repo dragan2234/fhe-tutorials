@@ -1,34 +1,14 @@
-use tfhe::shortint::prelude::*;
-use tfhe::shortint::Ciphertext as ShortIntCt;
-use std::array;
-
-#[derive(Clone)]
-struct U32Ct {
-    inner: [ShortIntCt; 8], // little endian
-}
-fn bits(x: u8) -> [bool; 8] {
-    array::from_fn(|i| (x >> i) & 1 == 1)
-}
-impl U32Ct {
-    fn encrypt(x: [u8;8], client_key: &ClientKey) -> Self {
-        let myvec: U32Ct;
-        for fourBit in x {
-            myvec.inner.fill(client_key.encrypt(fourBit.into()));
-        }
-
-        Self {
-            inner: myvec.inner.into()
-        }
-    }
-    fn rotate_left() {
-    }
-}
-
-
-struct FourBitVectorCt {
-    values: Vec<Ciphertext>,
-}
-
+use tfhe::FheUint16;
+// use tfhe::shortint::prelude::*;
+// use tfhe::shortint::Ciphertext as ShortIntCt;
+// use std::array;
+use tfhe::integer::*;
+use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+use tfhe::integer::gen_keys_radix;
+use tfhe::FheUint32;
+use tfhe::ConfigBuilder;
+use tfhe::generate_keys;
+use tfhe::prelude::FheEncrypt;
 // H constants
 const H: [u32; 8] = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -45,57 +25,133 @@ const K: [u32; 64] = [
     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ];
-fn main() {
-    // We generate a set of client/server keys, using the default parameters:
-    let (client_key, server_key) = gen_keys(PARAM_MESSAGE_4_CARRY_4);
 
-    let s = "hello world";
-    let mut bit_vec = Vec::new();
-
-    let mut ct_vec = Vec::new();
-
-    // process string as bytes and push them as 4bit values into bit_vec
-    for b in s.as_bytes() {
-        bit_vec.push((b & 0b11110000) >> 4);
-        bit_vec.push(b & 0b00001111);
-    }
-
-    println!("bit_vec: {:?}", bit_vec);
-    for value in &bit_vec {
-        println!("{:04b}", value);
-    }
-    println!("{}", bit_vec.len());
-
-    // push the encrypted 4bit values into ct_vec 
-    for b in bit_vec {
-        ct_vec.push(client_key.encrypt(b.into()));
-    }
-
-
-
-    // @todo: process string as bytes
-    // process bytes as shortint
-    // encrypt the input as vector of bits (4 bits? 8 bits?)
-    // do the sha256 over encrypted values using shortint library
-    // operations: And, Xor, Or, Rot, Shr, Add (mod 2^32)
-    // decrypt and compare with standard sha256 rust
-
-    // test code with some examples how tfhe-rs work:\
-    // let msg1 = 3;
-    // let msg2 = 3;
-    // let scalar = 4;
-
-    // let modulus = client_key.parameters.message_modulus.0;
-
-    // // We use the client key to encrypt two messages:
-    // let mut ct_1 = client_key.encrypt(msg1);
-    // let ct_2 = client_key.encrypt(msg2);
-
-    // server_key.unchecked_scalar_mul_assign(&mut ct_1, scalar);
-    // server_key.unchecked_sub_assign(&mut ct_1, &ct_2);
-    // server_key.unchecked_mul_lsb_assign(&mut ct_1, &ct_2);
-
-    // // We use the client key to decrypt the output of the circuit:
-    // let output = client_key.decrypt(&ct_1);
-    // println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
+pub struct Sha256 {
+    state: [u32; 8],
+    completed_data_blocks: u64,
+    pending: [u8; 64],
+    num_pending: usize,
 }
+
+impl Default for Sha256 {
+    fn default() -> Self {
+        Self {
+            state: H,
+            completed_data_blocks: 0,
+            pending: [0u8; 64],
+            num_pending: 0,
+        }
+    }
+}
+impl Sha256 {
+    pub fn with_state(state: [u32; 8]) -> Self {
+        Self {
+            state,
+            completed_data_blocks: 0,
+            pending: [0u8; 64],
+            num_pending: 0,
+        }
+    }
+}
+
+fn main() {
+    let config = ConfigBuilder::all_disabled()
+    .enable_default_uint16()
+    .build();
+
+    let (client_key, server_key) = generate_keys(config);
+     // Generate the client key and the server key:
+     let (cks, sks) = gen_keys_radix(&PARAM_MESSAGE_2_CARRY_2, size);
+
+    let bytes = "helo".as_bytes();
+    let u32_number = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64;
+    let test = 123 as u16;
+    let another_test = 1234 as u32;
+
+    let a = FheUint32::encrypt(another_test, &client_key);
+
+    let b = FheUint16::encrypt(test, &client_key);
+
+    let mut ct_input_string = cks.encrypt(u32_number);
+
+     let msg1 = 14;
+     let msg2 = 97;
+    
+     let mut ct1 = cks.encrypt(msg1);
+     let mut ct2 = cks.encrypt(msg2);
+    
+     let ct_res = sks.smart_bitxor(&mut ct1, &mut ct2);
+     // Decrypt:
+     let dec_result: u64 = cks.decrypt(&ct_res);
+     assert_eq!(dec_result, msg1 ^ msg2);
+
+    println!("test");
+}
+// fn main() {
+//     let mut num = Number32 {
+//         chunks: vec![0b1101, 0b0010, 0b1001, 0b0100],
+//     };
+
+//     println!("Before rotation:");
+//     num.print_chunks();
+
+//     num.rotate_left(6);
+
+//     println!("After rotation:");
+//     num.print_chunks();
+// }
+
+// fn mains() {
+//     // We generate a set of client/server keys, using the default parameters:
+//     let (client_key, server_key) = gen_keys(PARAM_MESSAGE_4_CARRY_4);
+
+//     let s = "hello world";
+//     let mut bit_vec = Vec::new();
+
+//     let mut ct_vec = Vec::new();
+
+//     // process string as bytes and push them as 4bit values into bit_vec
+//     for b in s.as_bytes() {
+//         bit_vec.push((b & 0b11110000) >> 4);
+//         bit_vec.push(b & 0b00001111);
+//     }
+
+//     println!("bit_vec: {:?}", bit_vec);
+//     for value in &bit_vec {
+//         println!("{:04b}", value);
+//     }
+//     println!("{}", bit_vec.len());
+
+//     // push the encrypted 4bit values into ct_vec 
+//     for b in bit_vec {
+//         ct_vec.push(client_key.encrypt(b.into()));
+//     }
+
+
+
+//     // @todo: process string as bytes
+//     // process bytes as shortint
+//     // encrypt the input as vector of bits (4 bits? 8 bits?)
+//     // do the sha256 over encrypted values using shortint library
+//     // operations: And, Xor, Or, Rot, Shr, Add (mod 2^32)
+//     // decrypt and compare with standard sha256 rust
+
+//     // test code with some examples how tfhe-rs work:\
+//     // let msg1 = 3;
+//     // let msg2 = 3;
+//     // let scalar = 4;
+
+//     // let modulus = client_key.parameters.message_modulus.0;
+
+//     // // We use the client key to encrypt two messages:
+//     // let mut ct_1 = client_key.encrypt(msg1);
+//     // let ct_2 = client_key.encrypt(msg2);
+
+//     // server_key.unchecked_scalar_mul_assign(&mut ct_1, scalar);
+//     // server_key.unchecked_sub_assign(&mut ct_1, &ct_2);
+//     // server_key.unchecked_mul_lsb_assign(&mut ct_1, &ct_2);
+
+//     // // We use the client key to decrypt the output of the circuit:
+//     // let output = client_key.decrypt(&ct_1);
+//     // println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
+// }
