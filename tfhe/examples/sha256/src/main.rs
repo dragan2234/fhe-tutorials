@@ -1,35 +1,66 @@
-// use tfhe::shortint::Parameters;
-// use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32, GenericInteger};
-// use tfhe::prelude::*;
-// use tfhe::FheUint2Parameters;
-// use tfhe::integer::ClientKey;
-// use tfhe::params::FheUint32Parameters;
-
-use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint8};
+use tfhe::shortint::Parameters;
+use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32, GenericInteger};
 use tfhe::prelude::*;
+use tfhe::FheUint2Parameters;
+use tfhe::integer::ClientKey;
+// H constants
+// const H: [u32; 8] = [
+//     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+// ];
+
+// struct HCipers {
+//     inner: GenericInteger<P>
+// }
+
+// #[derive(Clone)]
+// struct U32Ct {
+//     inner: [BoolCt; 32], // little endian
+// }
+
+struct InputCiphertext {
+    inner: Vec<FheUint32>,
+}
+
+impl InputCiphertext {
+    fn encrypt(x: Vec<u32>, client_key: &ClientKey) -> Self {
+        // let inner = x.iter().map(|value| {
+            let config = ConfigBuilder::all_disabled()
+                .enable_default_uint32()
+                .build();
+
+            // Client-side
+            let (client_key2, server_key) = generate_keys(config);
+            let inner = x.iter().map(|value| {
+                    FheUint32::try_encrypt(value, client_key).unwrap()
+                }).collect();
+        Self { inner }
+    }
+}
+
 fn main() {
     use std::time::Instant;
     let now = Instant::now();
     {
     let config = ConfigBuilder::all_disabled()
-        .enable_default_uint8()
+        .enable_default_uint32()
         .build();
 
     // Client-side
     let (client_key, server_key) = generate_keys(config);
 
-    let clear_a = 27u8;
-    let clear_b = 128u8;
+    let clear_a = 27u32;
+    let clear_b = 128u32;
 
-    let a = FheUint8::encrypt(clear_a, &client_key);
-    let b = FheUint8::encrypt(clear_b, &client_key);
+    let a = FheUint32::try_encrypt(clear_a, &client_key).unwrap();
+    let b = FheUint32::try_encrypt(clear_b, &client_key).unwrap();
 
     //Server-side
     set_server_key(server_key);
     let result = a + b;
 
+
     //Client-side
-    let decrypted_result: u8 = result.decrypt(&client_key);
+    let decrypted_result: u32 = result.decrypt(&client_key);
 
     let clear_result = clear_a + clear_b;
 
@@ -38,83 +69,13 @@ fn main() {
 
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
+
 }
-// // H constants
-// // const H: [u32; 8] = [
-// //     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-// // ];
 
-// // struct HCipers {
-// //     inner: GenericInteger<P>
-// // }
-
-// // #[derive(Clone)]
-// // struct U32Ct {
-// //     inner: [BoolCt; 32], // little endian
-// // }
-
-// struct InputCiphertext {
-//     inner: Vec<FheUint32>,
-// }
-
-// impl InputCiphertext {
-//     fn encrypt(x: Vec<u32>, client_key: &ClientKey) -> Self {
-//         // let inner = x.iter().map(|value| {
-//             let config = ConfigBuilder::all_disabled()
-//                 .enable_default_uint32()
-//                 .build();
-
-//             // Client-side
-//             let (client_key2, server_key) = generate_keys(config);
-//             // let inner = x.iter().map(|value| {
-//             //         FheUint32::try_encrypt(value, client_key2).unwrap()
-//             //     }).collect();
-//             // FheUint32::try_encrypt(clear_a, client_key).unwrap();
-//             let clear_a = 23u32;
-//             let inner = FheUint32::try_encrypt(clear_a, &client_key2).unwrap();
-//         Self { inner }
-//     }
-// }
-
-// fn main() {
-//     use std::time::Instant;
-//     let now = Instant::now();
-//     {
-//     let config = ConfigBuilder::all_disabled()
-//         .enable_default_uint32()
-//         .build();
-
-//     // Client-side
-//     let (client_key, server_key) = generate_keys(config);
-
-//     let clear_a = 27u32;
-//     let clear_b = 128u32;
-
-//     let a = FheUint32::try_encrypt(clear_a, &client_key).unwrap();
-//     let b = FheUint32::try_encrypt(clear_b, &client_key).unwrap();
-
-//     //Server-side
-//     set_server_key(server_key);
-//     let result = a + b;
-
-
-//     //Client-side
-//     let decrypted_result: u32 = result.decrypt(&client_key);
-
-//     let clear_result = clear_a + clear_b;
-
-//     assert_eq!(decrypted_result, clear_result);
-//     }
-
-//     let elapsed = now.elapsed();
-//     println!("Elapsed: {:.2?}", elapsed);
-
-// }
-
-// // H constants
-// const H: [u32; 8] = [
-//     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-// ];
+// H constants
+const H: [u32; 8] = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+];
 
 // // K constants
 // const K: [u32; 64] = [
