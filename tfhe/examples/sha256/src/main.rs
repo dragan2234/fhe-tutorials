@@ -1,8 +1,6 @@
-use tfhe::shortint::Parameters;
-use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32, GenericInteger};
+use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
-use tfhe::FheUint2Parameters;
-use tfhe::integer::ClientKey;
+
 // H constants
 // const H: [u32; 8] = [
 //     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -22,17 +20,12 @@ struct InputCiphertext {
 }
 
 impl InputCiphertext {
-    fn encrypt(x: Vec<u32>, client_key: &ClientKey) -> Self {
-        // let inner = x.iter().map(|value| {
-            let config = ConfigBuilder::all_disabled()
-                .enable_default_uint32()
-                .build();
-
-            // Client-side
-            let (client_key2, server_key) = generate_keys(config);
-            let inner = x.iter().map(|value| {
-                    FheUint32::try_encrypt(value, client_key).unwrap()
-                }).collect();
+    fn encrypt(x: Vec<u32>, client_key: &tfhe::ClientKey) -> Self {
+        let inner = x.iter()
+            .copied() // <- iter on u32 not &u32
+            .map(|value| {
+                FheUint32::try_encrypt(value, client_key).unwrap()
+            }).collect();
         Self { inner }
     }
 }
@@ -64,7 +57,21 @@ fn main() {
 
     let clear_result = clear_a + clear_b;
 
-    assert_eq!(decrypted_result, clear_result);
+
+    let result = string_to_u32_vector("hello world");
+
+    // let mut kurac = string_to_u32_vector("hello world");
+
+    let a = InputCiphertext::encrypt(result, &client_key);
+
+    let res = a.inner.first().unwrap();
+
+    let decr: u32 = res.decrypt(&client_key);
+    // assert_eq!(decrypted_result, clear_result);
+    // let final_ = kurac.first().unwrap();
+
+    // let inal = final_.clone();
+    // assert_eq!(inal, 104u32);
     }
 
     let elapsed = now.elapsed();
@@ -72,10 +79,26 @@ fn main() {
 
 }
 
+fn string_to_u32_vector(s: &str) -> Vec<u32> {
+    let mut result = Vec::new();
+    let bytes = s.as_bytes();
+
+    for i in (0..bytes.len()).step_by(4) {
+        let slice_end = std::cmp::min(i + 4, bytes.len());
+        let bytes_slice = &bytes[i..slice_end];
+        let mut value_bytes = [0u8; 4];
+        value_bytes[..bytes_slice.len()].copy_from_slice(bytes_slice);
+        let value = u32::from_be_bytes(value_bytes);
+        println!("My number is: {}", value);
+        result.push(value);
+    }
+
+    result
+}
 // H constants
-const H: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-];
+// const H: [u32; 8] = [
+//     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+// ];
 
 // // K constants
 // const K: [u32; 64] = [
