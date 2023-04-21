@@ -7,7 +7,7 @@ const H: [u32; 8] = [
 ];
 
 // K constants
-const K: [u32; 64] = [
+const K: &[u32] = &[
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -46,13 +46,46 @@ fn main() {
     use std::time::Instant;
     let now = Instant::now();
     {
-    // let config = ConfigBuilder::all_disabled()
-    //     .enable_default_uint32()
-    //     .build();
+
+    let hehe: Vec<u32> = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+].to_vec();
+
+    let keke: Vec<u32> = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+].to_vec();
+
+    let input_message = "RedBlockBlue";
+
+    let padded_input = padded_input(input_message);
+
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_uint32()
+        .build();
 
     // Client-side
-    // let (client_key, server_key) = generate_keys(config);
+    let (client_key, server_key) = generate_keys(config);
 
+    let input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
+
+    let h_ciphertext = InputCiphertext::encrypt(hehe, &client_key);
+
+    let k_ciphertext = InputCiphertext::encrypt(keke, &client_key);
+
+    let decrypted_result: u32 = input_ciphertext.inner.first().unwrap().decrypt(&client_key);
+
+    assert_eq!(decrypted_result, 1382376514);
+
+    let decrypted_result_h: u32 = h_ciphertext.inner.first().unwrap().decrypt(&client_key);
+
+    assert_eq!(1779033703, decrypted_result_h);
     // let clear_a = 27u32;
     // let clear_b = 128u32;
 
@@ -69,32 +102,7 @@ fn main() {
 
     // let clear_result = clear_a + clear_b;
 
-    let input_message = "RedBlockBlue";
 
-    let bit_length = input_message.as_bytes().len() * 8;
-    println!("{:?}", bit_length);
-
-    let mut result = string_to_u32_vector(input_message);
-
-    for i in result.len()..15 {
-        result.push(0u32);
-    }
-    result.push(bit_length as u32);
-    println!("{:?}", result);
-
-    let mut eight_bits = split_into_8bit_vector(&result.clone());
-
-    println!("{:?}", eight_bits);
-
-    replace_first_zero_byte(&mut eight_bits);
-
-    println!("{:?}", eight_bits);
-
-    let returned = vec_u8_to_u32(&eight_bits);
-
-    println!("{:?}", returned);
-
-    print_u32_binary(&returned);
 
     // let a = InputCiphertext::encrypt(result, &client_key);
 
@@ -166,7 +174,36 @@ fn vec_u8_to_u32(input: &[u8]) -> Vec<u32> {
 }
 
 
+fn padded_input(input_message: &str) -> Vec<u32> {
+    // let input_message = "RedBlockBlue";
 
+    let bit_length = input_message.as_bytes().len() * 8;
+    println!("{:?}", bit_length);
+
+    let mut result = string_to_u32_vector(input_message);
+
+    for i in result.len()..15 {
+        result.push(0u32);
+    }
+    result.push(bit_length as u32);
+    println!("{:?}", result);
+
+    let mut eight_bits = split_into_8bit_vector(&result.clone());
+
+    println!("{:?}", eight_bits);
+
+    replace_first_zero_byte(&mut eight_bits);
+
+    println!("{:?}", eight_bits);
+
+    let returned = vec_u8_to_u32(&eight_bits);
+
+    println!("{:?}", returned);
+
+    print_u32_binary(&returned);
+
+    returned
+}
 // pub struct Sha256 {
 //     state: [u32; 8],
 //     completed_data_blocks: u64,
