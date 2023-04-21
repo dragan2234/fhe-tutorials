@@ -69,16 +69,17 @@ fn main() {
 
     // let clear_result = clear_a + clear_b;
 
-    let input_message = "hello world";
+    let input_message = "RedBlockBlue";
 
     let bit_length = input_message.as_bytes().len() * 8;
     println!("{:?}", bit_length);
 
     let mut result = string_to_u32_vector(input_message);
 
-    for i in result.len()..16 {
+    for i in result.len()..15 {
         result.push(0u32);
     }
+    result.push(bit_length as u32);
     println!("{:?}", result);
 
     let mut eight_bits = split_into_8bit_vector(&result.clone());
@@ -93,6 +94,8 @@ fn main() {
 
     println!("{:?}", returned);
 
+    print_u32_binary(&returned);
+
     // let a = InputCiphertext::encrypt(result, &client_key);
 
     // let res = a.inner.first().unwrap();
@@ -104,6 +107,13 @@ fn main() {
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
 
+}
+
+// Chat-GPT generated helper functions
+fn print_u32_binary(v: &Vec<u32>) {
+    for value in v.iter() {
+        println!("{:032b}", value);
+    }
 }
 
 fn string_to_u32_vector(s: &str) -> Vec<u32> {
