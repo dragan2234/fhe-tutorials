@@ -1,3 +1,5 @@
+use std::ops::{BitAnd, ShlAssign, Shl};
+
 use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
 
@@ -72,6 +74,7 @@ fn main() {
 
     // Client-side
     let (client_key, server_key) = generate_keys(config);
+    set_server_key(server_key);
 
     let input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
 
@@ -81,34 +84,34 @@ fn main() {
 
     let decrypted_result: u32 = input_ciphertext.inner.first().unwrap().decrypt(&client_key);
 
+
+    let mut v = input_ciphertext.inner.first().unwrap();
+
+    let mut e = k_ciphertext.inner.first().unwrap();
+
+    // # In n<<d, last d bits are 0.
+    // # To put first 3 bits of n at
+    // # last, do bitwise or of n<<d
+    // # with n >>(INT_BITS - d)
+    // return (n << d)|(n >> (INT_BITS - d))
+    // (v as FheUint32) <<= 2;
+
+    // &v.bitshift
+    // &v << 2;
+
+
+    let bitwised = (v << 2u32) | (v >> 30u32);
+
+
+    let decrypted_bitwised: u32 = bitwised.decrypt(&client_key);
+
+    assert_eq!(decrypted_bitwised, 1234538761);
+
     assert_eq!(decrypted_result, 1382376514);
 
     let decrypted_result_h: u32 = h_ciphertext.inner.first().unwrap().decrypt(&client_key);
 
     assert_eq!(1779033703, decrypted_result_h);
-    // let clear_a = 27u32;
-    // let clear_b = 128u32;
-
-    // let a = FheUint32::try_encrypt(clear_a, &client_key).unwrap();
-    // let b = FheUint32::try_encrypt(clear_b, &client_key).unwrap();
-
-    //Server-side
-    // set_server_key(server_key);
-    // let result = a + b;
-
-
-    //Client-side
-    // let decrypted_result: u32 = result.decrypt(&client_key);
-
-    // let clear_result = clear_a + clear_b;
-
-
-
-    // let a = InputCiphertext::encrypt(result, &client_key);
-
-    // let res = a.inner.first().unwrap();
-
-    // let decr: u32 = res.decrypt(&client_key);
 
     }
 
