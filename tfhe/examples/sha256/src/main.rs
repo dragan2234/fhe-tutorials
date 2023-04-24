@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, ShlAssign, Shl, BitOr, Neg};
+use std::ops::{BitAnd, ShlAssign, Shl, BitOr, Neg, BitXor};
 
 use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
@@ -76,18 +76,27 @@ fn main() {
     let (client_key, server_key) = generate_keys(config);
     set_server_key(server_key);
 
-    let input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
+    let mut input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
 
     let h_ciphertext = InputCiphertext::encrypt(hehe, &client_key);
 
     let k_ciphertext = InputCiphertext::encrypt(keke, &client_key);
 
-    let decrypted_result: u32 = input_ciphertext.inner.first().unwrap().decrypt(&client_key);
+    //1787555839
+
+    // let res = rotate_left(h_ciphertext.inner.first().unwrap().clone() , 4);
+
+    // let decr_res_or: u32 = res.decrypt(&client_key);
 
 
-    let mut v = input_ciphertext.inner.first().unwrap();
+    // assert_eq!(decr_res_or, 3869285990u32);
 
-    let mut e = k_ciphertext.inner.first().unwrap();
+    // let decrypted_result: u32 = input_ciphertext.inner.first().clone().unwrap().decrypt(&client_key);
+
+
+    // let mut v = input_ciphertext.inner.first().clone().unwrap();
+
+    // let mut e = k_ciphertext.inner.first().unwrap();
 
     // # In n<<d, last d bits are 0.
     // # To put first 3 bits of n at
@@ -100,18 +109,82 @@ fn main() {
     // &v << 2;
 
 
-    let bitwised = (v << 2u32) | (v >> 30u32);
+    // let bitwised = (v << 2u32) | (v >> 30u32);
 
 
-    let decrypted_bitwised: u32 = bitwised.decrypt(&client_key);
+    // let decrypted_bitwised: u32 = bitwised.decrypt(&client_key);
 
-    assert_eq!(decrypted_bitwised, 1234538761);
+    // assert_eq!(decrypted_bitwised, 1234538761);
 
-    assert_eq!(decrypted_result, 1382376514);
+    // assert_eq!(decrypted_result, 1382376514);
 
-    let decrypted_result_h: u32 = h_ciphertext.inner.first().unwrap().decrypt(&client_key);
+    // let decrypted_result_h: u32 = h_ciphertext.inner.first().unwrap().decrypt(&client_key);
 
-    assert_eq!(1779033703, decrypted_result_h);
+    // assert_eq!(1779033703, decrypted_result_h);
+
+    for i in 16..63 {
+        let w_i_minus_2 = input_ciphertext.inner.get(i-2).unwrap();
+        let w_i_minus_7 = input_ciphertext.inner.get(i-7).unwrap();
+        let w_i_minus_15 = input_ciphertext.inner.get(i-15).unwrap();
+        let w_i_minus_16 = input_ciphertext.inner.get(i-16).unwrap();
+
+        let w_i = sigma_one(w_i_minus_2.clone()) + w_i_minus_7 + sigma_zero(w_i_minus_15.clone()) + w_i_minus_16;
+
+        input_ciphertext.inner.push(w_i);
+    }
+    let mut T_1: FheUint32;
+    let mut T_2: FheUint32;
+    let mut a = h_ciphertext.inner.get(0).unwrap().clone();
+    let mut b = h_ciphertext.inner.get(1).unwrap().clone();
+    let mut c = h_ciphertext.inner.get(2).unwrap().clone();
+    let mut d = h_ciphertext.inner.get(3).unwrap().clone();
+    let mut e = h_ciphertext.inner.get(4).unwrap().clone();
+    let mut f = h_ciphertext.inner.get(5).unwrap().clone();
+    let mut g = h_ciphertext.inner.get(6).unwrap().clone();
+    let mut h = h_ciphertext.inner.get(7).unwrap().clone();
+    let mut ch_val: FheUint32;
+    for i in 0..63 {
+        ch_val = ch(e.clone(),f.clone(),g.clone());
+        T_1 = h.clone() + capsigma_one(e.clone()) + ch_val.clone() + k_ciphertext.inner.get(i).unwrap().clone() + input_ciphertext.inner.get(i).unwrap().clone();
+        T_2 = capsigma_zero(a.clone()) + maj(a.clone(),b.clone(),c.clone());
+        h = g.clone();
+        g = f.clone();
+        f = e.clone();
+        e = d.clone() + T_1.clone();
+        d = c.clone();
+        c = b.clone();
+        b = a.clone();
+        a = T_1.clone() + T_2.clone();
+    }
+
+
+    let first_32 = h_ciphertext.inner.get(0).unwrap().clone() + a.clone();
+    let second_32 = h_ciphertext.inner.get(1).unwrap().clone() + b.clone();
+    let third_32 = h_ciphertext.inner.get(2).unwrap().clone() + c.clone();
+    let fourth_32 = h_ciphertext.inner.get(3).unwrap().clone() + d.clone();
+    let fifth_32 = h_ciphertext.inner.get(4).unwrap().clone() + e.clone();
+    let sixth_32 = h_ciphertext.inner.get(5).unwrap().clone() + f.clone();
+    let seventh_32 = h_ciphertext.inner.get(6).unwrap().clone() + g.clone();
+    let eight_32 = h_ciphertext.inner.get(7).unwrap().clone() + h.clone();
+
+    let decrypted_first: u32 = first_32.decrypt(&client_key);
+    let decrypted_second: u32 = second_32.decrypt(&client_key);
+    let decrypted_third: u32 = third_32.decrypt(&client_key);
+    let decrypted_fourth: u32 = fourth_32.decrypt(&client_key);
+    let decrypted_fifth: u32 = fifth_32.decrypt(&client_key);
+    let decrypted_sixth: u32 = sixth_32.decrypt(&client_key);
+    let decrypted_seventh: u32 = seventh_32.decrypt(&client_key);
+    let decrypted_eight: u32 = eight_32.decrypt(&client_key);
+
+    println!("Decrypted First: {}", decrypted_first);
+    println!("Decrypted Second: {}", decrypted_second);
+    println!("Decrypted Third: {}", decrypted_third);
+    println!("Decrypted Fourth: {}", decrypted_fourth);
+    println!("Decrypted Fifth: {}", decrypted_fifth);
+    println!("Decrypted Sixth: {}", decrypted_sixth);
+    println!("Decrypted Seventh: {}", decrypted_seventh);
+    println!("Decrypted Eight: {}", decrypted_eight);
+
 
     }
 
@@ -207,163 +280,70 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 
     returned
 }
-// pub struct Sha256 {
-//     state: [u32; 8],
-//     completed_data_blocks: u64,
-//     pending: [u8; 64],
-//     num_pending: usize,
-// }
-
-// impl Default for Sha256 {
-//     fn default() -> Self {
-//         Self {
-//             state: H,
-//             completed_data_blocks: 0,
-//             pending: [0u8; 64],
-//             num_pending: 0,
-//         }
-//     }
-// }
-// impl Sha256 {
-//     pub fn with_state(state: [u32; 8]) -> Self {
-//         Self {
-//             state,
-//             completed_data_blocks: 0,
-//             pending: [0u8; 64],
-//             num_pending: 0,
-//         }
-//     }
-// }
-
-// fn mainewq() {
-//     let config = ConfigBuilder::all_disabled()
-//     .enable_default_uint16()
-//     .build();
-
-//     let (client_key, server_key) = generate_keys(config);
-//      // Generate the client key and the server key:
-//      let (cks, sks) = gen_keys_radix(&PARAM_MESSAGE_2_CARRY_2, size);
-
-//     let bytes = "helo".as_bytes();
-//     let u32_number = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64;
-//     let test = 123 as u16;
-//     let another_test = 1234 as u32;
-
-//     let a = FheUint32::encrypt(another_test, &client_key);
-
-//     let b = FheUint16::encrypt(test, &client_key);
-
-//     let mut ct_input_string = cks.encrypt(u32_number);
-
-//      let msg1 = 14;
-//      let msg2 = 97;
-    
-//      let mut ct1 = cks.encrypt(msg1);
-//      let mut ct2 = cks.encrypt(msg2);
-    
-//      let ct_res = sks.smart_bitxor(&mut ct1, &mut ct2);
-//      // Decrypt:
-//      let dec_result: u64 = cks.decrypt(&ct_res);
-//      assert_eq!(dec_result, msg1 ^ msg2);
-
-//     println!("test");
-// }
-// fn main() {
-//     let mut num = Number32 {
-//         chunks: vec![0b1101, 0b0010, 0b1001, 0b0100],
-//     };
-
-//     println!("Before rotation:");
-//     num.print_chunks();
-
-//     num.rotate_left(6);
-
-//     println!("After rotation:");
-//     num.print_chunks();
-// }
-
-// fn mains() {
-//     // We generate a set of client/server keys, using the default parameters:
-//     let (client_key, server_key) = gen_keys(PARAM_MESSAGE_4_CARRY_4);
-
-//     let s = "hello world";
-//     let mut bit_vec = Vec::new();
-
-//     let mut ct_vec = Vec::new();
-
-//     // process string as bytes and push them as 4bit values into bit_vec
-//     for b in s.as_bytes() {
-//         bit_vec.push((b & 0b11110000) >> 4);
-//         bit_vec.push(b & 0b00001111);
-//     }
-
-//     println!("bit_vec: {:?}", bit_vec);
-//     for value in &bit_vec {
-//         println!("{:04b}", value);
-//     }
-//     println!("{}", bit_vec.len());
-
-//     // push the encrypted 4bit values into ct_vec 
-//     for b in bit_vec {
-//         ct_vec.push(client_key.encrypt(b.into()));
-//     }
 
 
-
-//     // @todo: process string as bytes
-//     // process bytes as shortint
-//     // encrypt the input as vector of bits (4 bits? 8 bits?)
-//     // do the sha256 over encrypted values using shortint library
-//     // operations: And, Xor, Or, Rot, Shr, Add (mod 2^32)
-//     // decrypt and compare with standard sha256 rust
-
-//     // test code with some examples how tfhe-rs work:\
-//     // let msg1 = 3;
-//     // let msg2 = 3;
-//     // let scalar = 4;
-
-//     // let modulus = client_key.parameters.message_modulus.0;
-
-//     // // We use the client key to encrypt two messages:
-//     // let mut ct_1 = client_key.encrypt(msg1);
-//     // let ct_2 = client_key.encrypt(msg2);
-
-//     // server_key.unchecked_scalar_mul_assign(&mut ct_1, scalar);
-//     // server_key.unchecked_sub_assign(&mut ct_1, &ct_2);
-//     // server_key.unchecked_mul_lsb_assign(&mut ct_1, &ct_2);
-
-//     // // We use the client key to decrypt the output of the circuit:
-//     // let output = client_key.decrypt(&ct_1);
-//     // println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
-// }
-
-
-fn ch_function(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-    let res = x.clone().bitand(y).bitor(x.clone().neg().bitand(z));
+fn ch(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
+    let res = x.clone().bitand(y).bitxor(x.clone().neg().bitand(z));
     res 
 }
 
-fn maj_function(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-    let res = x.clone().bitand(y.clone()).bitor(x.clone().bitand(z.clone())).bitor(y.clone().bitand(z.clone()));
+fn maj(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
+    let res = x.clone().bitand(y.clone()).bitxor(x.clone().bitand(z.clone())).bitxor(y.clone().bitand(z.clone()));
     res
 }
 
-fn capsigma_function(x: FheUint32) -> FheUint32 {
+fn capsigma_zero(x: FheUint32) -> FheUint32 {
     let mut first = rotate_right(x.clone(),2);
 
     let mut second = rotate_right(x.clone(),13);
     let mut third = rotate_right(x.clone(),22);
 
-    let res = first.bitand(second.clone()).bitand(third.clone());
+    let res = first.bitxor(second.clone()).bitxor(third.clone());
 
     res
 }
+
+fn capsigma_one(x: FheUint32) -> FheUint32 {
+    let mut first = rotate_right(x.clone(),6);
+
+    let mut second = rotate_right(x.clone(),11);
+    let mut third = rotate_right(x.clone(),25);
+
+    let res = first.bitxor(second.clone()).bitxor(third.clone());
+
+    res
+}
+
+fn sigma_zero(x: FheUint32) -> FheUint32 {
+    let mut first = rotate_right(x.clone(),7);
+
+    let mut second = rotate_right(x.clone(),18);
+    let mut third = x >> 3u32;
+
+    let res = first.bitxor(second.clone()).bitxor(third.clone());
+
+    res
+}
+
+fn sigma_one(x: FheUint32) -> FheUint32 {
+    let mut first = rotate_right(x.clone(),17);
+
+    let mut second = rotate_right(x.clone(),19);
+    let mut third = x >> 10u32;
+
+    let res = first.bitxor(second.clone()).bitxor(third.clone());
+
+    res
+}
+
+
 // RotR(X, 2) ⊕ RotR(X, 13) ⊕ RotR(X, 22),
 
 fn rotate_left(x: FheUint32, amount: u32) -> FheUint32 {
     let res  = (x.clone() << amount) | (x.clone() >> (32u32 - amount));
     res
 }
+
 fn rotate_right(x: FheUint32, amount: u32) -> FheUint32 {
     let res  = (x.clone() >> amount) | (x.clone() << (32u32 - amount));
     res
