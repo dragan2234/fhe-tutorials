@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, ShlAssign, Shl};
+use std::ops::{BitAnd, ShlAssign, Shl, BitOr, Neg};
 
 use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
@@ -336,3 +336,35 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 //     // let output = client_key.decrypt(&ct_1);
 //     // println!("expected {}, found {}", ((msg1 * scalar as u64 - msg2) * msg2) % modulus as u64, output);
 // }
+
+
+fn ch_function(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
+    let res = x.clone().bitand(y).bitor(x.clone().neg().bitand(z));
+    res 
+}
+
+fn maj_function(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
+    let res = x.clone().bitand(y.clone()).bitor(x.clone().bitand(z.clone())).bitor(y.clone().bitand(z.clone()));
+    res
+}
+
+fn capsigma_function(x: FheUint32) -> FheUint32 {
+    let mut first = rotate_right(x.clone(),2);
+
+    let mut second = rotate_right(x.clone(),13);
+    let mut third = rotate_right(x.clone(),22);
+
+    let res = first.bitand(second.clone()).bitand(third.clone());
+
+    res
+}
+// RotR(X, 2) ⊕ RotR(X, 13) ⊕ RotR(X, 22),
+
+fn rotate_left(x: FheUint32, amount: u32) -> FheUint32 {
+    let res  = (x.clone() << amount) | (x.clone() >> (32u32 - amount));
+    res
+}
+fn rotate_right(x: FheUint32, amount: u32) -> FheUint32 {
+    let res  = (x.clone() >> amount) | (x.clone() << (32u32 - amount));
+    res
+}
