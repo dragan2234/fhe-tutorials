@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, Neg, BitXor};
+use std::ops::{BitAnd, Neg, BitXor, ShrAssign};
 
 use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
@@ -25,7 +25,7 @@ struct OutputSha256 {
 
 impl OutputSha256 {
     fn decrypt_final(ct_vec: Vec<FheUint32>,  client_key: &tfhe::ClientKey) -> Self {
-        let inner = ct_vec.iter().map(|value| {
+        let inner = ct_vec.clone().iter().map(|value| {
             value.decrypt(&client_key)
         }).collect();
         Self { inner }
@@ -33,7 +33,7 @@ impl OutputSha256 {
 
     fn print_hex(&self) {
         let hex_vec: Vec<String> = self.inner.iter().map(|value| format!("{:08x}", value)).collect();
-        let hex_string = hex_vec.join(" ");
+        let hex_string = hex_vec.join("");
         println!("{}", hex_string);
     }
 }
@@ -58,7 +58,7 @@ fn main() {
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ].to_vec();
 
-    let input_message = "liguliguqweqweqwe";
+    let input_message = "RedBlueBlock";
 
     let padded_input = padded_input(input_message);
 
@@ -70,22 +70,26 @@ fn main() {
     let (client_key, server_key) = generate_keys(config);
     set_server_key(server_key);
 
+
     let mut input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
 
     let h_ciphertext = InputCiphertext::encrypt(h_vec, &client_key);
 
     let k_ciphertext = InputCiphertext::encrypt(k_vec, &client_key);
 
-    for i in 16..63 {
+
+    for i in 16..64 {
         let w_i_minus_2 = input_ciphertext.inner.get(i-2).unwrap().clone();
         let w_i_minus_7 = input_ciphertext.inner.get(i-7).unwrap().clone();
         let w_i_minus_15 = input_ciphertext.inner.get(i-15).unwrap().clone();
         let w_i_minus_16 = input_ciphertext.inner.get(i-16).unwrap().clone();
+        let sigma_one_res = sigma_one(w_i_minus_2).clone();
+        let sigma_zero_res = sigma_zero(w_i_minus_15).clone();
 
-        let w_i = sigma_one(w_i_minus_2) + w_i_minus_7 + sigma_zero(w_i_minus_15) + w_i_minus_16;
-
+        let w_i = sigma_one_res.clone() + w_i_minus_7 + sigma_zero_res.clone() + w_i_minus_16;
         input_ciphertext.inner.push(w_i);
     }
+
     let mut t_1: FheUint32;
     let mut t_2: FheUint32;
     let mut a = h_ciphertext.inner.get(0).unwrap().clone();
@@ -97,7 +101,7 @@ fn main() {
     let mut g = h_ciphertext.inner.get(6).unwrap().clone();
     let mut h = h_ciphertext.inner.get(7).unwrap().clone();
     let mut ch_val: FheUint32;
-    for i in 0..63 {
+    for i in 0..64 {
         ch_val = ch(e.clone(),f.clone(),g.clone());
         t_1 = h.clone() + capsigma_one(e.clone()) + ch_val.clone() + k_ciphertext.inner.get(i).unwrap().clone() + input_ciphertext.inner.get(i).unwrap().clone();
         t_2 = capsigma_zero(a.clone()) + maj(a.clone(),b.clone(),c.clone());
@@ -136,7 +140,6 @@ fn main() {
 
 fn padded_input(input_message: &str) -> Vec<u32> {
     let bit_length = input_message.as_bytes().len() * 8;
-    println!("{:?}", bit_length);
 
     let mut result = string_to_u32_vector(input_message);
 
@@ -144,33 +147,57 @@ fn padded_input(input_message: &str) -> Vec<u32> {
         result.push(0u32);
     }
     result.push(bit_length as u32);
-    println!("{:?}", result);
 
     let mut eight_bits = split_into_8bit_vector(&result.clone());
 
-    println!("{:?}", eight_bits);
 
     replace_first_zero_byte(&mut eight_bits);
 
-    println!("{:?}", eight_bits);
-
     let returned = vec_u8_to_u32(&eight_bits);
-
-    println!("{:?}", returned);
-
-    print_u32_binary(&returned);
 
     returned
 }
 
 
 fn ch(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-    let res = x.clone().bitand(y).bitxor(x.clone().neg().bitand(z));
+
+    let x_ = x.clone();
+
+    let neg_x = x.clone().neg() - 1u32;
+
+    let y_ = y.clone();
+
+    let z_ = z.clone();
+
+    let first_val = x_.bitand(y_);
+    let second_val = neg_x.bitand(z_);
+
+    let res = first_val.clone().bitxor(second_val.clone());
+
     res 
 }
 
 fn maj(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-    let res = x.clone().bitand(y.clone()).bitxor(x.clone().bitand(z.clone())).bitxor(y.clone().bitand(z.clone()));
+
+    let x_first = x.clone();
+
+    let y_first = y.clone();
+
+    let z_first = z.clone();
+
+    let x_second = x.clone();
+
+    let y_second = y.clone();
+
+    let z_second = z.clone();
+
+    let first_value = x_first.bitand(y_first);
+
+    let second_value = x_second.bitand(z_first);
+
+    let third_value = y_second.bitand(z_second);
+
+    let res = first_value.bitxor(second_value).bitxor(third_value);
     res
 }
 
@@ -181,6 +208,7 @@ fn capsigma_zero(x: FheUint32) -> FheUint32 {
     let third = rotate_right(x.clone(),22);
 
     let res = first.bitxor(second.clone()).bitxor(third.clone());
+
 
     res
 }
@@ -200,7 +228,7 @@ fn sigma_zero(x: FheUint32) -> FheUint32 {
     let first = rotate_right(x.clone(),7);
 
     let second = rotate_right(x.clone(),18);
-    let third = x >> 3u32;
+    let third = x.clone() >> 3u32;
 
     let res = first.bitxor(second.clone()).bitxor(third.clone());
 
@@ -208,28 +236,31 @@ fn sigma_zero(x: FheUint32) -> FheUint32 {
 }
 
 fn sigma_one(x: FheUint32) -> FheUint32 {
+
     let first = rotate_right(x.clone(),17);
 
     let second = rotate_right(x.clone(),19);
-    let third = x >> 10u32;
+
+    let third: FheUint32 = x.clone() >> 10u32;
 
     let res = first.bitxor(second.clone()).bitxor(third.clone());
-
     res
 }
 
 
 fn rotate_right(x: FheUint32, amount: u32) -> FheUint32 {
-    let res  = (x.clone() >> amount) | (x.clone() << (32u32 - amount));
+    let mut x_ = x.clone();
+    let other = 32u32 - amount;
+    let first: FheUint32 = x.clone() << other;
+
+    x_.shr_assign(amount);
+
+    let res = first.clone() + x_.clone();
+
     res
 }
 
 // Chat-GPT generated helper functions
-fn print_u32_binary(v: &Vec<u32>) {
-    for value in v.iter() {
-        println!("{:032b}", value);
-    }
-}
 
 fn string_to_u32_vector(s: &str) -> Vec<u32> {
     let mut result = Vec::new();
@@ -241,7 +272,6 @@ fn string_to_u32_vector(s: &str) -> Vec<u32> {
         let mut value_bytes = [0u8; 4];
         value_bytes[..bytes_slice.len()].copy_from_slice(bytes_slice);
         let value = u32::from_be_bytes(value_bytes);
-        println!("My number is: {}", value);
         result.push(value);
     }
 
