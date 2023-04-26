@@ -50,7 +50,7 @@ fn main() {
     // Client-side
     let (client_key, server_key) = generate_keys(config);
 
-    let input_message = "abc";
+    let input_message = "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc";
 
     let padded_input = padded_input(input_message);
 
@@ -77,7 +77,7 @@ fn main() {
     set_server_key(server_key);
 
 
-    let h_ciphertext = InputCiphertext::encrypt(h_vec.clone(), &client_key);
+    let mut h_ciphertext = InputCiphertext::encrypt(h_vec.clone(), &client_key);
 
     let k_ciphertext = InputCiphertext::encrypt(k_vec.clone(), &client_key);
 
@@ -152,6 +152,31 @@ fn main() {
         sixth_32 = sixth_32 + f;
         seventh_32 = seventh_32 + g;
         eight_32 = eight_32 + h;
+
+        if let Some(a_) = h_ciphertext.inner.get_mut(0) {
+            *a_ = first_32.clone();
+        }
+        if let Some(b_) = h_ciphertext.inner.get_mut(1) {
+            *b_ = second_32.clone();
+        }
+        if let Some(c_) = h_ciphertext.inner.get_mut(2) {
+            *c_ = third_32.clone();
+        }
+        if let Some(d_) = h_ciphertext.inner.get_mut(3) {
+            *d_ = fourth_32.clone();
+        }
+        if let Some(e_) = h_ciphertext.inner.get_mut(4) {
+            *e_ = fifth_32.clone();
+        }
+        if let Some(f_) = h_ciphertext.inner.get_mut(5) {
+            *f_ = sixth_32.clone();
+        }
+        if let Some(g_) = h_ciphertext.inner.get_mut(6) {
+            *g_ = seventh_32.clone();
+        }
+        if let Some(h_) = h_ciphertext.inner.get_mut(7) {
+            *h_ = eight_32.clone();
+        }
 
     let vec_fin_oth = vec![first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()];
 
