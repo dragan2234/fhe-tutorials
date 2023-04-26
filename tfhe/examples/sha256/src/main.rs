@@ -167,11 +167,17 @@ fn main() {
 fn padded_input(input_message: &str) -> Vec<u32> {
     let bit_length: u64 = (input_message.as_bytes().len() as u64) * 8u64;
 
-    let n = bit_length / 512 + 1;
+    let n = (bit_length + 64) / 512 + 1;
 
     let mut result = string_to_u32_vector(input_message);
 
     let size_u32 = ((n*16u64) as usize) - 2;
+
+    println!("result len: {}", result.len());
+
+    println!("size: {}", size_u32);
+
+    println!("bit len: {}", bit_length);
 
     for _i in result.len()..size_u32 {
         result.push(0u32);
@@ -179,7 +185,6 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 
     let upper: u32 = (bit_length >> 32) as u32;
     let lower: u32 = bit_length as u32;
-
 
     result.push(upper);
     result.push(lower);
@@ -273,6 +278,7 @@ fn sigma_zero(x: FheUint32) -> FheUint32 {
 
     res
 }
+
 
 fn sigma_one(x: FheUint32) -> FheUint32 {
 
