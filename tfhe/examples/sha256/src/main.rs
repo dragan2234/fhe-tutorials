@@ -43,6 +43,21 @@ fn main() {
     let now = Instant::now();
     {
 
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_uint32()
+        .build();
+
+    // Client-side
+    let (client_key, server_key) = generate_keys(config);
+
+    let input_message = "RedBlueBlock";
+
+    let padded_input = padded_input(input_message);
+
+
+
+
+
     let h_vec: Vec<u32> = [
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
     ].to_vec();
@@ -58,72 +73,83 @@ fn main() {
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ].to_vec();
 
-    let input_message = "RedBlueBlock";
-
-    let padded_input = padded_input(input_message);
-
-    let config = ConfigBuilder::all_disabled()
-        .enable_default_uint32()
-        .build();
-
-    // Client-side
-    let (client_key, server_key) = generate_keys(config);
+    // Server side
     set_server_key(server_key);
 
 
-    let mut input_ciphertext = InputCiphertext::encrypt(padded_input, &client_key);
+    let h_ciphertext = InputCiphertext::encrypt(h_vec.clone(), &client_key);
 
-    let h_ciphertext = InputCiphertext::encrypt(h_vec, &client_key);
-
-    let k_ciphertext = InputCiphertext::encrypt(k_vec, &client_key);
+    let k_ciphertext = InputCiphertext::encrypt(k_vec.clone(), &client_key);
 
 
-    for i in 16..64 {
-        let w_i_minus_2 = input_ciphertext.inner.get(i-2).unwrap().clone();
-        let w_i_minus_7 = input_ciphertext.inner.get(i-7).unwrap().clone();
-        let w_i_minus_15 = input_ciphertext.inner.get(i-15).unwrap().clone();
-        let w_i_minus_16 = input_ciphertext.inner.get(i-16).unwrap().clone();
-        let sigma_one_res = sigma_one(w_i_minus_2).clone();
-        let sigma_zero_res = sigma_zero(w_i_minus_15).clone();
+    let mut first_32: FheUint32 = h_ciphertext.inner.get(0).unwrap().clone();
+    let mut second_32: FheUint32 = h_ciphertext.inner.get(1).unwrap().clone();
+    let mut third_32: FheUint32 = h_ciphertext.inner.get(2).unwrap().clone();
+    let mut fourth_32: FheUint32 = h_ciphertext.inner.get(3).unwrap().clone();
+    let mut fifth_32: FheUint32 = h_ciphertext.inner.get(4).unwrap().clone();
+    let mut sixth_32: FheUint32 = h_ciphertext.inner.get(5).unwrap().clone();
+    let mut seventh_32: FheUint32 = h_ciphertext.inner.get(6).unwrap().clone();
+    let mut eight_32: FheUint32 = h_ciphertext.inner.get(7).unwrap().clone();
 
-        let w_i = sigma_one_res.clone() + w_i_minus_7 + sigma_zero_res.clone() + w_i_minus_16;
-        input_ciphertext.inner.push(w_i);
+
+
+    for chunk in padded_input.chunks(16) {
+        let chunk_padded_input: Vec<u32> = chunk.to_vec();
+
+        let mut input_ciphertext = InputCiphertext::encrypt(chunk_padded_input, &client_key);
+
+        for i in 16..64 {
+            let w_i_minus_2 = input_ciphertext.inner.get(i-2).unwrap().clone();
+            let w_i_minus_7 = input_ciphertext.inner.get(i-7).unwrap().clone();
+            let w_i_minus_15 = input_ciphertext.inner.get(i-15).unwrap().clone();
+            let w_i_minus_16 = input_ciphertext.inner.get(i-16).unwrap().clone();
+            let sigma_one_res = sigma_one(w_i_minus_2).clone();
+            let sigma_zero_res = sigma_zero(w_i_minus_15).clone();
+
+            let w_i = sigma_one_res.clone() + w_i_minus_7 + sigma_zero_res.clone() + w_i_minus_16;
+            input_ciphertext.inner.push(w_i);
+
+            println!("i je: {}", i);
+        }
+
+        let mut t_1: FheUint32;
+        let mut t_2: FheUint32;
+        let mut a = h_ciphertext.inner.get(0).unwrap().clone();
+        let mut b = h_ciphertext.inner.get(1).unwrap().clone();
+        let mut c = h_ciphertext.inner.get(2).unwrap().clone();
+        let mut d = h_ciphertext.inner.get(3).unwrap().clone();
+        let mut e = h_ciphertext.inner.get(4).unwrap().clone();
+        let mut f = h_ciphertext.inner.get(5).unwrap().clone();
+        let mut g = h_ciphertext.inner.get(6).unwrap().clone();
+        let mut h = h_ciphertext.inner.get(7).unwrap().clone();
+        let mut ch_val: FheUint32;
+        for i in 0..64 {
+            ch_val = ch(e.clone(),f.clone(),g.clone());
+            t_1 = h.clone() + capsigma_one(e.clone()) + ch_val.clone() + k_ciphertext.inner.get(i).unwrap().clone() + input_ciphertext.inner.get(i).unwrap().clone();
+            t_2 = capsigma_zero(a.clone()) + maj(a.clone(),b.clone(),c.clone());
+            h = g.clone();
+            g = f.clone();
+            f = e.clone();
+            e = d.clone() + t_1.clone();
+            d = c.clone();
+            c = b.clone();
+            b = a.clone();
+            a = t_1.clone() + t_2.clone();
+
+            println!("drugo i je: {}", i);
+
+        }
+
+        first_32 = first_32 + a;
+        second_32 = second_32 + b;
+        third_32 = third_32 + c;
+        fourth_32 = fourth_32 + d;
+        fifth_32 = fifth_32 + e;
+        sixth_32 = sixth_32 + f;
+        seventh_32 = seventh_32 + g;
+        eight_32 = eight_32 + h;
+
     }
-
-    let mut t_1: FheUint32;
-    let mut t_2: FheUint32;
-    let mut a = h_ciphertext.inner.get(0).unwrap().clone();
-    let mut b = h_ciphertext.inner.get(1).unwrap().clone();
-    let mut c = h_ciphertext.inner.get(2).unwrap().clone();
-    let mut d = h_ciphertext.inner.get(3).unwrap().clone();
-    let mut e = h_ciphertext.inner.get(4).unwrap().clone();
-    let mut f = h_ciphertext.inner.get(5).unwrap().clone();
-    let mut g = h_ciphertext.inner.get(6).unwrap().clone();
-    let mut h = h_ciphertext.inner.get(7).unwrap().clone();
-    let mut ch_val: FheUint32;
-    for i in 0..64 {
-        ch_val = ch(e.clone(),f.clone(),g.clone());
-        t_1 = h.clone() + capsigma_one(e.clone()) + ch_val.clone() + k_ciphertext.inner.get(i).unwrap().clone() + input_ciphertext.inner.get(i).unwrap().clone();
-        t_2 = capsigma_zero(a.clone()) + maj(a.clone(),b.clone(),c.clone());
-        h = g.clone();
-        g = f.clone();
-        f = e.clone();
-        e = d.clone() + t_1.clone();
-        d = c.clone();
-        c = b.clone();
-        b = a.clone();
-        a = t_1.clone() + t_2.clone();
-    }
-
-
-    let first_32 = h_ciphertext.inner.get(0).unwrap() + a;
-    let second_32 = h_ciphertext.inner.get(1).unwrap() + b;
-    let third_32 = h_ciphertext.inner.get(2).unwrap() + c;
-    let fourth_32 = h_ciphertext.inner.get(3).unwrap() + d;
-    let fifth_32 = h_ciphertext.inner.get(4).unwrap() + e;
-    let sixth_32 = h_ciphertext.inner.get(5).unwrap() + f;
-    let seventh_32 = h_ciphertext.inner.get(6).unwrap() + g;
-    let eight_32 = h_ciphertext.inner.get(7).unwrap() + h;
 
     let vec_fin = vec![first_32, second_32, third_32, fourth_32, fifth_32, sixth_32, seventh_32, eight_32];
 
@@ -139,14 +165,25 @@ fn main() {
 }
 
 fn padded_input(input_message: &str) -> Vec<u32> {
-    let bit_length = input_message.as_bytes().len() * 8;
+    let bit_length: u64 = (input_message.as_bytes().len() as u64) * 8u64;
+
+    let n = bit_length / 512 + 1;
 
     let mut result = string_to_u32_vector(input_message);
 
-    for _i in result.len()..15 {
+    let size_u32 = ((n*16u64) as usize) - 2;
+
+    for _i in result.len()..size_u32 {
         result.push(0u32);
     }
-    result.push(bit_length as u32);
+
+    let upper: u32 = (bit_length >> 32) as u32;
+    let lower: u32 = bit_length as u32;
+
+
+    result.push(upper);
+    result.push(lower);
+
 
     let mut eight_bits = split_into_8bit_vector(&result.clone());
 
@@ -154,6 +191,8 @@ fn padded_input(input_message: &str) -> Vec<u32> {
     replace_first_zero_byte(&mut eight_bits);
 
     let returned = vec_u8_to_u32(&eight_bits);
+
+    print_u32_binary(&returned);
 
     returned
 }
@@ -308,4 +347,10 @@ fn vec_u8_to_u32(input: &[u8]) -> Vec<u32> {
         output.push(value);
     }
     output
+}
+
+fn print_u32_binary(v: &Vec<u32>) {
+    for value in v.iter() {
+        println!("{:032b}", value);
+    }
 }
