@@ -50,7 +50,7 @@ fn main() {
     // Client-side
     let (client_key, server_key) = generate_keys(config);
 
-    let input_message = "RedBlueBlock";
+    let input_message = "abc";
 
     let padded_input = padded_input(input_message);
 
@@ -112,6 +112,10 @@ fn main() {
             println!("i je: {}", i);
         }
 
+        let test_vec = OutputSha256::decrypt_final(input_ciphertext.inner.clone(), &client_key);
+
+        OutputSha256::print_hex(&test_vec);
+
         let mut t_1: FheUint32;
         let mut t_2: FheUint32;
         let mut a = h_ciphertext.inner.get(0).unwrap().clone();
@@ -148,6 +152,13 @@ fn main() {
         sixth_32 = sixth_32 + f;
         seventh_32 = seventh_32 + g;
         eight_32 = eight_32 + h;
+
+    let vec_fin_oth = vec![first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()];
+
+
+    let result_r = OutputSha256::decrypt_final(vec_fin_oth, &client_key);
+
+    OutputSha256::print_hex(&result_r);
 
     }
 
@@ -252,7 +263,6 @@ fn capsigma_zero(x: FheUint32) -> FheUint32 {
     let third = rotate_right(x.clone(),22);
 
     let res = first.bitxor(second.clone()).bitxor(third.clone());
-
 
     res
 }
