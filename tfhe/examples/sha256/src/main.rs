@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, Neg, BitXor, ShrAssign};
+use std::ops::Neg;
 
 use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint32};
 use tfhe::prelude::*;
@@ -50,7 +50,7 @@ fn main() {
     // Client-side
     let (client_key, server_key) = generate_keys(config);
 
-    let input_message = "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc";
+    let input_message = "abc";
 
     let padded_input = padded_input(input_message);
 
@@ -105,8 +105,6 @@ fn main() {
 
             let w_i = sigma_one_res.clone() + w_i_minus_7 + sigma_zero_res.clone() + w_i_minus_16;
             input_ciphertext.inner.push(w_i);
-
-            println!("i je: {}", i);
         }
 
         let test_vec = OutputSha256::decrypt_final(input_ciphertext.inner.clone(), &client_key);
@@ -137,9 +135,6 @@ fn main() {
             c = b.clone();
             b = a.clone();
             a = t_1.clone() + t_2.clone();
-
-            println!("drugo i je: {}", i);
-
         }
 
         first_32 += a;
@@ -157,13 +152,6 @@ fn main() {
         ) {
             *elem = value.clone();
         }
-
-        let vec_fin_oth = vec![first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()];
-
-
-        let result_r = OutputSha256::decrypt_final(vec_fin_oth, &client_key);
-
-        OutputSha256::print_hex(&result_r);
 
     }
 
@@ -189,11 +177,6 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 
     let size_u32 = ((n*16u64) as usize) - 2;
 
-    println!("result len: {}", result.len());
-
-    println!("size: {}", size_u32);
-
-    println!("bit len: {}", bit_length);
 
     for _i in result.len()..size_u32 {
         result.push(0u32);
@@ -213,8 +196,7 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 
     let returned = vec_u8_to_u32(&eight_bits);
 
-    print_u32_binary(&returned);
-
+    // print_u32_binary(&returned);
     returned
 }
 
