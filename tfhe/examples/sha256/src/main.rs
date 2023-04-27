@@ -50,12 +50,9 @@ fn main() {
     // Client-side
     let (client_key, server_key) = generate_keys(config);
 
-    let input_message = "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc";
+    let input_message = "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc";
 
     let padded_input = padded_input(input_message);
-
-
-
 
 
     let h_vec: Vec<u32> = [
@@ -127,6 +124,7 @@ fn main() {
         let mut g = h_ciphertext.inner.get(6).unwrap().clone();
         let mut h = h_ciphertext.inner.get(7).unwrap().clone();
         let mut ch_val: FheUint32;
+
         for i in 0..64 {
             ch_val = ch(e.clone(),f.clone(),g.clone());
             t_1 = h.clone() + capsigma_one(e.clone()) + ch_val.clone() + k_ciphertext.inner.get(i).unwrap().clone() + input_ciphertext.inner.get(i).unwrap().clone();
@@ -144,46 +142,28 @@ fn main() {
 
         }
 
-        first_32 = first_32 + a;
-        second_32 = second_32 + b;
-        third_32 = third_32 + c;
-        fourth_32 = fourth_32 + d;
-        fifth_32 = fifth_32 + e;
-        sixth_32 = sixth_32 + f;
-        seventh_32 = seventh_32 + g;
-        eight_32 = eight_32 + h;
+        first_32 += a;
+        second_32 += b;
+        third_32 += c;
+        fourth_32 += d;
+        fifth_32 += e;
+        sixth_32 += f;
+        seventh_32 += g;
+        eight_32 += h;
 
-        if let Some(a_) = h_ciphertext.inner.get_mut(0) {
-            *a_ = first_32.clone();
-        }
-        if let Some(b_) = h_ciphertext.inner.get_mut(1) {
-            *b_ = second_32.clone();
-        }
-        if let Some(c_) = h_ciphertext.inner.get_mut(2) {
-            *c_ = third_32.clone();
-        }
-        if let Some(d_) = h_ciphertext.inner.get_mut(3) {
-            *d_ = fourth_32.clone();
-        }
-        if let Some(e_) = h_ciphertext.inner.get_mut(4) {
-            *e_ = fifth_32.clone();
-        }
-        if let Some(f_) = h_ciphertext.inner.get_mut(5) {
-            *f_ = sixth_32.clone();
-        }
-        if let Some(g_) = h_ciphertext.inner.get_mut(6) {
-            *g_ = seventh_32.clone();
-        }
-        if let Some(h_) = h_ciphertext.inner.get_mut(7) {
-            *h_ = eight_32.clone();
+        for (elem, value) in h_ciphertext.inner.iter_mut().zip(
+            [first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()]
+                .iter(),
+        ) {
+            *elem = value.clone();
         }
 
-    let vec_fin_oth = vec![first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()];
+        let vec_fin_oth = vec![first_32.clone(), second_32.clone(), third_32.clone(), fourth_32.clone(), fifth_32.clone(), sixth_32.clone(), seventh_32.clone(), eight_32.clone()];
 
 
-    let result_r = OutputSha256::decrypt_final(vec_fin_oth, &client_key);
+        let result_r = OutputSha256::decrypt_final(vec_fin_oth, &client_key);
 
-    OutputSha256::print_hex(&result_r);
+        OutputSha256::print_hex(&result_r);
 
     }
 
@@ -240,104 +220,33 @@ fn padded_input(input_message: &str) -> Vec<u32> {
 
 
 fn ch(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-
-    let x_ = x.clone();
-
-    let neg_x = x.clone().neg() - 1u32;
-
-    let y_ = y.clone();
-
-    let z_ = z.clone();
-
-    let first_val = x_.bitand(y_);
-    let second_val = neg_x.bitand(z_);
-
-    let res = first_val.clone().bitxor(second_val.clone());
-
-    res 
+    (x.clone() & y.clone()) ^ ((x.clone().neg() - 1u32) & z.clone())
 }
 
 fn maj(x: FheUint32, y: FheUint32, z: FheUint32) -> FheUint32 {
-
-    let x_first = x.clone();
-
-    let y_first = y.clone();
-
-    let z_first = z.clone();
-
-    let x_second = x.clone();
-
-    let y_second = y.clone();
-
-    let z_second = z.clone();
-
-    let first_value = x_first.bitand(y_first);
-
-    let second_value = x_second.bitand(z_first);
-
-    let third_value = y_second.bitand(z_second);
-
-    let res = first_value.bitxor(second_value).bitxor(third_value);
-    res
+    (x.clone() & y.clone()) ^ (x.clone() & z.clone()) ^ (y.clone() & z.clone())
 }
 
 fn capsigma_zero(x: FheUint32) -> FheUint32 {
-    let first = rotate_right(x.clone(),2);
-
-    let second = rotate_right(x.clone(),13);
-    let third = rotate_right(x.clone(),22);
-
-    let res = first.bitxor(second.clone()).bitxor(third.clone());
-
-    res
+    rotate_right(x.clone(),2) ^ rotate_right(x.clone(),13) ^ rotate_right(x.clone(),22) 
 }
 
 fn capsigma_one(x: FheUint32) -> FheUint32 {
-    let first = rotate_right(x.clone(),6);
-
-    let second = rotate_right(x.clone(),11);
-    let third = rotate_right(x.clone(),25);
-
-    let res = first.bitxor(second.clone()).bitxor(third.clone());
-
-    res
+    rotate_right(x.clone(),6) ^ rotate_right(x.clone(),11) ^ rotate_right(x.clone(),25)
 }
 
 fn sigma_zero(x: FheUint32) -> FheUint32 {
-    let first = rotate_right(x.clone(),7);
-
-    let second = rotate_right(x.clone(),18);
-    let third = x.clone() >> 3u32;
-
-    let res = first.bitxor(second.clone()).bitxor(third.clone());
-
-    res
+    rotate_right(x.clone(),7) ^ rotate_right(x.clone(),18) ^ (x.clone() >> 3u32)
 }
 
 
 fn sigma_one(x: FheUint32) -> FheUint32 {
-
-    let first = rotate_right(x.clone(),17);
-
-    let second = rotate_right(x.clone(),19);
-
-    let third: FheUint32 = x.clone() >> 10u32;
-
-    let res = first.bitxor(second.clone()).bitxor(third.clone());
-    res
+    rotate_right(x.clone(),17) ^ rotate_right(x.clone(),19) ^ (x.clone() >> 10u32)
 }
 
 
 fn rotate_right(x: FheUint32, amount: u32) -> FheUint32 {
-    let mut x_ = x.clone();
-    let other = 32u32 - amount;
-    let first: FheUint32 = x.clone() << other;
-
-    x_.shr_assign(amount);
-
-    let res = first.clone() + x_.clone();
-
-    res
+    (x.clone() >> amount) | (x.clone() << (32u32 - amount))
 }
 
 // Chat-GPT generated helper functions
